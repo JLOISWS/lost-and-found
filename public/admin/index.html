@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-logo">失物招领</div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html" class="active">仪表盘</a>
+        <a href="/admin/posts.html">信息管理</a>
+        <a href="/admin/users.html">用户管理</a>
+        <a href="/admin/settings.html">系统设置</a>
+        <a href="/" target="_blank">前台首页</a>
+      </nav>
+      <button onclick="adminLogout()" class="btn btn-block">退出登录</button>
+    </aside>
+    
+    <main class="admin-main">
+      <h1 class="admin-title">仪表盘</h1>
+      <div id="statsCards" class="stats-grid"></div>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const checkAdmin = async () => {
+      const user = await api('/api/user');
+      if (!user || user.role !== 'admin') {
+        location.href = '/admin/login.html';
+        return false;
+      }
+      return true;
+    };
+    
+    const loadStats = async () => {
+      try {
+        const stats = await api('/api/admin/stats');
+        document.getElementById('statsCards').innerHTML = `
+          <div class="stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">总发布数</div></div>
+          <div class="stat-card warning"><div class="stat-value">${stats.pending}</div><div class="stat-label">待审核</div></div>
+          <div class="stat-card success"><div class="stat-value">${stats.claimed}</div><div class="stat-label">已认领/归还</div></div>
+          <div class="stat-card"><div class="stat-value">${stats.users}</div><div class="stat-label">注册用户</div></div>
+          <div class="stat-card info"><div class="stat-value">${stats.todayNew}</div><div class="stat-label">今日新增</div></div>
+        `;
+      } catch (e) {
+        Toast.error(e.message);
+      }
+    };
+    
+    const adminLogout = async () => {
+      await api('/api/admin/logout');
+      location.href = '/admin/login.html';
+    };
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (await checkAdmin()) loadStats();
+    });
+  </script>
+</body>
+</html>

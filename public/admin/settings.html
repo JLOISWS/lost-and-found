@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统设置 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-logo">失物招领</div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html">仪表盘</a>
+        <a href="/admin/posts.html">信息管理</a>
+        <a href="/admin/users.html">用户管理</a>
+        <a href="/admin/settings.html" class="active">系统设置</a>
+        <a href="/" target="_blank">前台首页</a>
+      </nav>
+      <button onclick="adminLogout()" class="btn btn-block">退出登录</button>
+    </aside>
+    
+    <main class="admin-main">
+      <h1 class="admin-title">系统设置</h1>
+      <form class="settings-form" onsubmit="saveSettings(event)">
+        <div class="form-group">
+          <label>网站标题</label>
+          <input type="text" name="site_title" id="site_title">
+        </div>
+        <div class="form-group">
+          <label>网站标语</label>
+          <input type="text" name="site_slogan" id="site_slogan">
+        </div>
+        <div class="form-group">
+          <label>页脚版权</label>
+          <input type="text" name="footer_copyright" id="footer_copyright">
+        </div>
+        <button type="submit" class="btn btn-primary">保存设置</button>
+      </form>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const checkAdmin = async () => {
+      const user = await api('/api/user');
+      if (!user || user.role !== 'admin') { location.href = '/admin/login.html'; return false; }
+      return true;
+    };
+    
+    const loadSettings = async () => {
+      try {
+        const data = await api('/api/admin/settings');
+        document.getElementById('site_title').value = data.settings.site_title || '';
+        document.getElementById('site_slogan').value = data.settings.site_slogan || '';
+        document.getElementById('footer_copyright').value = data.settings.footer_copyright || '';
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const saveSettings = async e => {
+      e.preventDefault();
+      const form = e.target;
+      try {
+        await api('/api/admin/settings', { method: 'PUT', body: {
+          settings: {
+            site_title: form.site_title.value,
+            site_slogan: form.site_slogan.value,
+            footer_copyright: form.footer_copyright.value
+          }
+        }});
+        Toast.success('保存成功');
+      } catch (err) { Toast.error(err.message); }
+    };
+    
+    const adminLogout = async () => { await api('/api/admin/logout'); location.href = '/admin/login.html'; };
+    
+    document.addEventListener('DOMContentLoaded', async () => { if (await checkAdmin()) loadSettings(); });
+  </script>
+</body>
+</html>

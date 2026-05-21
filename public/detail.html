@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>物品详情 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-content">
+      <a href="/" class="logo">失物招领</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">首页</a>
+        <a href="/search.html" class="nav-link">搜索</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container detail-page">
+    <div id="postDetail"></div>
+    <div id="commentsSection" class="comments-section">
+      <h3>留言区</h3>
+      <div id="commentsList"></div>
+      <form id="commentForm" class="comment-form" onsubmit="submitComment(event)">
+        <textarea name="content" placeholder="留下您的线索或建议..." rows="3" required></textarea>
+        <button type="submit" class="btn btn-primary">发表留言</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const postId = new URLSearchParams(location.search).get('id');
+    
+    const loadDetail = async () => {
+      try {
+        const post = await api('/api/posts/' + postId);
+        const statusMap = { pending: '待审核', approved: '已发布', rejected: '已拒绝', claimed: '已认领', returned: '已归还' };
+        document.getElementById('postDetail').innerHTML = `
+          <div class="detail-header">
+            <span class="type-badge ${post.type}">${post.type === 'lost' ? '寻物' : '招领'}</span>
+            <span class="status-badge ${post.status}">${statusMap[post.status] || post.status}</span>
+          </div>
+          <h1 class="detail-title">${escapeHtml(post.title)}</h1>
+          <div class="detail-meta">
+            <span>发布者：${escapeHtml(post.username)}</span>
+            <span>${post.views} 次浏览</span>
+            <span>${formatDate(post.created_at)}</span>
+          </div>
+          <div class="detail-images">
+            ${post.images && post.images.length ? post.images.map(src => `<img src="${src}" alt="物品图片" onclick="window.open(this.src)">`).join('') : '<p>暂无图片</p>'}
+          </div>
+          <div class="detail-info">
+            <div class="info-item"><label>物品类型：</label><span>${escapeHtml(post.category)}</span></div>
+            <div class="info-item"><label>${post.type === 'lost' ? '丢失' : '拾取'}时间：</label><span>${post.post_date || '未知'}</span></div>
+            <div class="info-item"><label>${post.type === 'lost' ? '丢失' : '拾取'}地点：</label><span>${escapeHtml(post.location) || '未知'}</span></div>
+            <div class="info-item"><label>联系方式：</label><span>${escapeHtml(post.contact) || '未填写'}</span></div>
+            <div class="info-item full"><label>详细描述：</label><p>${escapeHtml(post.description) || '无'}</p></div>
+          </div>
+          <div class="detail-actions">
+            <button onclick="toggleFavorite()" class="btn ${post.isFavorited ? 'btn-primary' : 'btn-outline'}" id="favBtn">
+              ${post.isFavorited ? '已收藏' : '收藏'}
+            </button>
+          </div>
+        `;
+        loadComments();
+      } catch (e) {
+        document.getElementById('postDetail').innerHTML = '<p class="error">加载失败：' + escapeHtml(e.message) + '</p>';
+      }
+    };
+    
+    const loadComments = async () => {
+      try {
+        const comments = await api('/api/posts/' + postId + '/comments');
+        document.getElementById('commentsList').innerHTML = comments.length ? comments.map(c => `
+          <div class="comment-item">
+            <div class="comment-header">
+              <span class="comment-author">${escapeHtml(c.username)}</span>
+              <span class="comment-time">${formatDate(c.created_at)}</span>
+            </div>
+            <p class="comment-content">${escapeHtml(c.content)}</p>
+          </div>
+        `).join('') : '<p class="empty">暂无留言</p>';
+      } catch (e) {}
+    };
+    
+    const submitComment = async e => {
+      e.preventDefault();
+      if (!currentUser) return Toast.error('请先登录');
+      const form = e.target;
+      try {
+        await api('/api/posts/' + postId + '/comments', { method: 'POST', body: { content: form.content.value } });
+        form.reset();
+        loadComments();
+        Toast.success('留言成功');
+      } catch (err) {
+        Toast.error(err.message);
+      }
+    };
+    
+    const toggleFavorite = async () => {
+      if (!currentUser) return Toast.error('请先登录');
+      try {
+        const result = await api('/api/favorites/' + postId, { method: 'POST' });
+        const btn = document.getElementById('favBtn');
+        btn.textContent = result.favorited ? '已收藏' : '收藏';
+        btn.className = 'btn ' + (result.favorited ? 'btn-primary' : 'btn-outline');
+        Toast.success(result.favorited ? '收藏成功' : '已取消收藏');
+      } catch (e) {
+        Toast.error(e.message);
+      }
+    };
+    
+    document.addEventListener('DOMContentLoaded', loadDetail);
+  </script>
+</body>
+</html>

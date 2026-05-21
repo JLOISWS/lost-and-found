@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-content">
+      <a href="/" class="logo">失物招领</a>
+      <nav class="nav">
+        <a href="/" class="nav-link active">首页</a>
+        <a href="/publish.html?type=lost" class="nav-link">寻物发布</a>
+        <a href="/publish.html?type=found" class="nav-link">招领发布</a>
+        <a href="/search.html" class="nav-link">搜索</a>
+      </nav>
+      <div id="authBtns" class="auth-btns">
+        <a href="/login.html" class="btn btn-outline">登录</a>
+        <a href="/register.html" class="btn btn-primary">注册</a>
+      </div>
+      <div id="userMenu" class="user-menu hidden">
+        <span class="username"></span>
+        <a href="/my-posts.html" class="btn btn-text">我的发布</a>
+        <button onclick="logout()" class="btn btn-text">退出</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>让每一件失物找到回家的路</h1>
+      <p>快速发布、精准匹配、高效找回</p>
+      <form class="search-form" onsubmit="handleSearch(event)">
+        <input type="text" id="searchKeyword" placeholder="输入关键词搜索..." class="search-input">
+        <button type="submit" class="btn btn-primary">搜索</button>
+      </form>
+      <div class="quick-btns">
+        <a href="/publish.html?type=lost" class="btn btn-danger btn-lg">我丢了东西</a>
+        <a href="/publish.html?type=found" class="btn btn-success btn-lg">我捡到东西</a>
+      </div>
+    </div>
+  </section>
+
+  <main class="container main">
+    <section class="section">
+      <div class="section-header">
+        <h2>最新寻物</h2>
+        <a href="/search.html?type=lost" class="more-link">查看更多</a>
+      </div>
+      <div id="lostPosts" class="post-grid"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>最新招领</h2>
+        <a href="/search.html?type=found" class="more-link">查看更多</a>
+      </div>
+      <div id="foundPosts" class="post-grid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>© 2024 失物招领平台 版权所有</p>
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const handleSearch = e => {
+      e.preventDefault();
+      const keyword = document.getElementById('searchKeyword').value.trim();
+      location.href = '/search.html?keyword=' + encodeURIComponent(keyword);
+    };
+
+    const renderPostCard = post => `
+      <a href="/detail.html?id=${post.id}" class="post-card ${post.type}">
+        <div class="card-image">
+          ${post.images && post.images[0] ? `<img src="${post.images[0]}" alt="${escapeHtml(post.title)}">` : '<div class="no-image">暂无图片</div>'}
+          ${post.is_top ? '<span class="top-badge">置顶</span>' : ''}
+        </div>
+        <div class="card-body">
+          <span class="type-badge ${post.type}">${post.type === 'lost' ? '寻物' : '招领'}</span>
+          <h3 class="card-title">${escapeHtml(post.title)}</h3>
+          <p class="card-meta">
+            <span>${post.location || '未知地点'}</span>
+            <span>${post.post_date || ''}</span>
+          </p>
+          <p class="card-time">${formatDate(post.created_at)}</p>
+        </div>
+      </a>
+    `;
+
+    const loadPosts = async () => {
+      try {
+        const [lost, found] = await Promise.all([
+          api('/api/posts?type=lost&limit=8'),
+          api('/api/posts?type=found&limit=8')
+        ]);
+        document.getElementById('lostPosts').innerHTML = lost.posts.map(renderPostCard).join('') || '<p class="empty">暂无寻物信息</p>';
+        document.getElementById('foundPosts').innerHTML = found.posts.map(renderPostCard).join('') || '<p class="empty">暂无招领信息</p>';
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', loadPosts);
+  </script>
+</body>
+</html>

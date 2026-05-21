@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发布信息 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-content">
+      <a href="/" class="logo">失物招领</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">首页</a>
+        <a href="/publish.html?type=lost" class="nav-link">寻物发布</a>
+        <a href="/publish.html?type=found" class="nav-link">招领发布</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="publish-page">
+      <div class="type-tabs">
+        <button class="tab-btn" data-type="lost">我丢了东西</button>
+        <button class="tab-btn" data-type="found">我捡到东西</button>
+      </div>
+      
+      <form id="publishForm" class="publish-form" onsubmit="handleSubmit(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>物品名称 <span class="required">*</span></label>
+            <input type="text" name="title" required placeholder="如：黑色iPhone 14 Pro">
+          </div>
+          <div class="form-group">
+            <label>物品类型</label>
+            <select name="category" id="categorySelect"></select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label id="dateLabel">丢失时间</label>
+            <input type="date" name="post_date">
+          </div>
+          <div class="form-group">
+            <label id="locationLabel">丢失地点</label>
+            <input type="text" name="location" placeholder="如：图书馆三楼自习室">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>详细描述</label>
+          <textarea name="description" rows="4" placeholder="物品特征、颜色、品牌、大小等详细信息"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>联系方式</label>
+          <input type="text" name="contact" placeholder="手机号或微信号">
+        </div>
+        
+        <div class="form-group">
+          <label>上传图片（最多6张）</label>
+          <input type="file" name="images" accept="image/*" multiple onchange="previewImages(this, document.getElementById('imagePreview'))">
+          <div id="imagePreview" class="image-preview"></div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-lg">提交发布</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let postType = 'lost';
+    
+    const init = async () => {
+      const params = new URLSearchParams(location.search);
+      postType = params.get('type') || 'lost';
+      setActiveTab(postType);
+      
+      try {
+        const categories = await api('/api/categories');
+        const select = document.getElementById('categorySelect');
+        select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+      } catch (e) {}
+      
+      const user = await api('/api/user');
+      if (!user) {
+        Toast.error('请先登录');
+        setTimeout(() => location.href = '/login.html', 1000);
+      }
+    };
+    
+    const setActiveTab = type => {
+      postType = type;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+      });
+      const isLost = type === 'lost';
+      document.getElementById('dateLabel').textContent = isLost ? '丢失时间' : '拾取时间';
+      document.getElementById('locationLabel').textContent = isLost ? '丢失地点' : '拾取地点';
+    };
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => setActiveTab(btn.dataset.type);
+    });
+    
+    const handleSubmit = async e => {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData();
+      formData.append('type', postType);
+      formData.append('title', form.title.value);
+      formData.append('category', form.category.value);
+      formData.append('post_date', form.post_date.value);
+      formData.append('location', form.location.value);
+      formData.append('description', form.description.value);
+      formData.append('contact', form.contact.value);
+      
+      const files = form.images.files;
+      for (let i = 0; i < files.length && i < 6; i++) {
+        formData.append('images', files[i]);
+      }
+      
+      try {
+        const res = await fetch('/api/posts', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        Toast.success('发布成功，等待审核');
+        setTimeout(() => location.href = '/my-posts.html', 1000);
+      } catch (err) {
+        Toast.error(err.message);
+      }
+    };
+    
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

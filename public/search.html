@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搜索 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-content">
+      <a href="/" class="logo">失物招领</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="search-page">
+      <form class="search-filter" onsubmit="handleSearch(event)">
+        <div class="filter-row">
+          <input type="text" name="keyword" id="keywordInput" placeholder="搜索关键词..." class="search-input-lg">
+        </div>
+        <div class="filter-row">
+          <select name="type" id="typeSelect">
+            <option value="all">全部类型</option>
+            <option value="lost">寻物</option>
+            <option value="found">招领</option>
+          </select>
+          <select name="category" id="categorySelect">
+            <option value="all">全部分类</option>
+          </select>
+          <button type="submit" class="btn btn-primary">搜索</button>
+        </div>
+      </form>
+      <div id="searchResults" class="post-grid"></div>
+      <div id="pagination"></div>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let currentPage = 1;
+    
+    const init = async () => {
+      const params = new URLSearchParams(location.search);
+      document.getElementById('keywordInput').value = params.get('keyword') || '';
+      document.getElementById('typeSelect').value = params.get('type') || 'all';
+      
+      try {
+        const categories = await api('/api/categories');
+        const select = document.getElementById('categorySelect');
+        categories.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+        select.value = params.get('category') || 'all';
+      } catch (e) {}
+      
+      search();
+    };
+    
+    const handleSearch = e => {
+      e.preventDefault();
+      currentPage = 1;
+      search();
+    };
+    
+    const search = async () => {
+      const params = new URLSearchParams();
+      const keyword = document.getElementById('keywordInput').value.trim();
+      const type = document.getElementById('typeSelect').value;
+      const category = document.getElementById('categorySelect').value;
+      if (keyword) params.set('keyword', keyword);
+      if (type !== 'all') params.set('type', type);
+      if (category !== 'all') params.set('category', category);
+      params.set('page', currentPage);
+      params.set('limit', 12);
+      
+      try {
+        const data = await api('/api/posts?' + params);
+        const html = data.posts.map(post => `
+          <a href="/detail.html?id=${post.id}" class="post-card ${post.type}">
+            <div class="card-image">
+              ${post.images && post.images[0] ? `<img src="${post.images[0]}" alt="${escapeHtml(post.title)}">` : '<div class="no-image">暂无图片</div>'}
+            </div>
+            <div class="card-body">
+              <span class="type-badge ${post.type}">${post.type === 'lost' ? '寻物' : '招领'}</span>
+              <h3 class="card-title">${escapeHtml(post.title)}</h3>
+              <p class="card-meta">${post.location || '未知地点'}</p>
+              <p class="card-time">${formatDate(post.created_at)}</p>
+            </div>
+          </a>
+        `).join('');
+        document.getElementById('searchResults').innerHTML = html || '<p class="empty">暂无数据</p>';
+        renderPagination(document.getElementById('pagination'), data, page => { currentPage = page; search(); });
+      } catch (e) {
+        Toast.error(e.message);
+      }
+    };
+    
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

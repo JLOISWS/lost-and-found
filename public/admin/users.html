@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-logo">失物招领</div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html">仪表盘</a>
+        <a href="/admin/posts.html">信息管理</a>
+        <a href="/admin/users.html" class="active">用户管理</a>
+        <a href="/admin/settings.html">系统设置</a>
+        <a href="/" target="_blank">前台首页</a>
+      </nav>
+      <button onclick="adminLogout()" class="btn btn-block">退出登录</button>
+    </aside>
+    
+    <main class="admin-main">
+      <h1 class="admin-title">用户管理</h1>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>ID</th><th>用户名</th><th>手机</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody id="usersTable"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let currentPage = 1;
+    
+    const checkAdmin = async () => {
+      const user = await api('/api/user');
+      if (!user || user.role !== 'admin') { location.href = '/admin/login.html'; return false; }
+      return true;
+    };
+    
+    const loadUsers = async () => {
+      try {
+        const data = await api(`/api/admin/users?page=${currentPage}&limit=20`);
+        document.getElementById('usersTable').innerHTML = data.users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.phone) || '-'}</td>
+            <td>${u.role === 'admin' ? '<span class="badge badge-primary">管理员</span>' : '普通用户'}</td>
+            <td><span class="status-badge ${u.status}">${u.status === 'active' ? '正常' : '封禁'}</span></td>
+            <td>${formatDate(u.created_at)}</td>
+            <td class="actions">
+              ${u.role !== 'admin' ? `<button onclick="toggleStatus(${u.id}, '${u.status}')" class="btn btn-sm">${u.status === 'active' ? '封禁' : '解封'}</button>` : '-'}
+            </td>
+          </tr>
+        `).join('');
+        renderPagination(document.getElementById('pagination'), data, page => { currentPage = page; loadUsers(); });
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const toggleStatus = async (id, currentStatus) => {
+      const newStatus = currentStatus === 'active' ? 'banned' : 'active';
+      try {
+        await api('/api/admin/users/' + id, { method: 'PATCH', body: { status: newStatus } });
+        Toast.success('操作成功');
+        loadUsers();
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const adminLogout = async () => { await api('/api/admin/logout'); location.href = '/admin/login.html'; };
+    
+    document.addEventListener('DOMContentLoaded', async () => { if (await checkAdmin()) loadUsers(); });
+  </script>
+</body>
+</html>

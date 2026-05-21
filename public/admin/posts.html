@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>信息管理 - 失物招领平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-logo">失物招领</div>
+      <nav class="admin-nav">
+        <a href="/admin/index.html">仪表盘</a>
+        <a href="/admin/posts.html" class="active">信息管理</a>
+        <a href="/admin/users.html">用户管理</a>
+        <a href="/admin/settings.html">系统设置</a>
+        <a href="/" target="_blank">前台首页</a>
+      </nav>
+      <button onclick="adminLogout()" class="btn btn-block">退出登录</button>
+    </aside>
+    
+    <main class="admin-main">
+      <h1 class="admin-title">信息管理</h1>
+      <div class="filter-bar">
+        <select id="statusFilter" onchange="loadPosts()">
+          <option value="all">全部状态</option>
+          <option value="pending">待审核</option>
+          <option value="approved">已发布</option>
+          <option value="rejected">已拒绝</option>
+          <option value="claimed">已认领</option>
+          <option value="returned">已归还</option>
+        </select>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>ID</th><th>类型</th><th>标题</th><th>发布者</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody id="postsTable"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    let currentPage = 1;
+    
+    const checkAdmin = async () => {
+      const user = await api('/api/user');
+      if (!user || user.role !== 'admin') { location.href = '/admin/login.html'; return false; }
+      return true;
+    };
+    
+    const loadPosts = async () => {
+      const status = document.getElementById('statusFilter').value;
+      try {
+        const data = await api(`/api/admin/posts?status=${status}&page=${currentPage}&limit=15`);
+        const statusMap = { pending: '待审核', approved: '已发布', rejected: '已拒绝', claimed: '已认领', returned: '已归还' };
+        document.getElementById('postsTable').innerHTML = data.posts.map(p => `
+          <tr>
+            <td>${p.id}</td>
+            <td><span class="type-badge ${p.type}">${p.type === 'lost' ? '寻物' : '招领'}</span></td>
+            <td><a href="/detail.html?id=${p.id}" target="_blank">${escapeHtml(p.title)}</a></td>
+            <td>${escapeHtml(p.username)}</td>
+            <td><span class="status-badge ${p.status}">${statusMap[p.status]}</span></td>
+            <td>${formatDate(p.created_at)}</td>
+            <td class="actions">
+              ${p.status === 'pending' ? `<button onclick="setStatus(${p.id}, 'approved')" class="btn btn-sm btn-success">通过</button><button onclick="setStatus(${p.id}, 'rejected')" class="btn btn-sm btn-danger">拒绝</button>` : ''}
+              <button onclick="deletePost(${p.id})" class="btn btn-sm btn-danger">删除</button>
+              <button onclick="toggleTop(${p.id})" class="btn btn-sm">${p.is_top ? '取消置顶' : '置顶'}</button>
+            </td>
+          </tr>
+        `).join('');
+        renderPagination(document.getElementById('pagination'), data, page => { currentPage = page; loadPosts(); });
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const setStatus = async (id, status) => {
+      try {
+        await api('/api/posts/' + id + '/status', { method: 'PATCH', body: { status } });
+        Toast.success('操作成功');
+        loadPosts();
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const deletePost = async id => {
+      if (!confirm('确定删除？')) return;
+      try {
+        await api('/api/admin/posts/' + id, { method: 'DELETE' });
+        Toast.success('删除成功');
+        loadPosts();
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const toggleTop = async id => {
+      try {
+        await api('/api/posts/' + id + '/top', { method: 'PATCH' });
+        Toast.success('操作成功');
+        loadPosts();
+      } catch (e) { Toast.error(e.message); }
+    };
+    
+    const adminLogout = async () => { await api('/api/admin/logout'); location.href = '/admin/login.html'; };
+    
+    document.addEventListener('DOMContentLoaded', async () => { if (await checkAdmin()) loadPosts(); });
+  </script>
+</body>
+</html>
